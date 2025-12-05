@@ -1,84 +1,102 @@
-import express from 'express';
-import mysql from 'mysql2/promise';
-import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// server.js - Versão Simplificada (APENAS API)
 
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const mysql = require('mysql2/promise'); // Usando o mysql2/promise para async/await
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const app = express();
-const PORT = 3001; 
+const port = 3001;
 
-// Middlewares
-app.use(cors()); 
-app.use(express.json()); 
-
-// --- 1. CONFIGURAÇÃO DO BANCO DE DADOS (Preencha suas credenciais!) ---
+// --- Configuração do MySQL (Ajuste suas credenciais aqui) ---
 const dbConfig = {
     host: 'localhost',
-    user: 'root',           
-    password: 'Camis1708@',
-    database: 'SistemaApmEstoque',
+    user: 'root',
+    password: 'password', // Altere para sua senha real
+    database: 'estoque_db' // Altere para o nome real do seu banco
 };
 
-const frontendPath = path.join(__dirname, 'dist');
-app.use(express.static(frontendPath));
+// --- Middlewares ---
+// 1. CORS: Permite que o Frontend (5173) acesse esta API (3001)
+app.use(cors()); 
+// 2. Body Parser: Processa requisições JSON
+app.use(bodyParser.json());
 
+// --- Rotas da API (API Routes) ---
 
-// --- 3. ROTAS DA API ---
+// 1. Conexão com o Banco de Dados
+const getConnection = async () => {
+    return await mysql.createConnection(dbConfig);
+};
 
-// Rota de Login (POST /api/login)
-app.post('/api/login', async (req, res) => {
-    const { matricula, senha } = req.body;
-    
-    if (!matricula || !senha) {
-        return res.status(400).json({ message: 'Matrícula e senha são obrigatórias.' });
-    }
-    
-    let connection;
-    try {
-        connection = await mysql.createConnection(dbConfig);
-        
-        const [rows] = await connection.execute(
-            'SELECT id_usuario, nome, senha_hash FROM Usuarios WHERE matricula = ?', 
-            [matricula]
-        );
-
-        if (rows.length === 0) {
-            return res.status(401).json({ message: 'Matrícula não encontrada.' });
-        }
-
-        const usuario = rows[0];
-        
-        // Lógica de verificação de senha simples (Substituir por bcrypt em produção!)
-        if (senha === "senai123") { 
-            return res.status(200).json({
-                success: true,
-                userName: usuario.nome,
-                message: 'Login bem-sucedido!',
-            });
-        } else {
-             return res.status(401).json({ message: 'Senha incorreta.' });
-        }
-        
-    } catch (error) {
-        console.error('Erro no login:', error);
-        return res.status(500).json({ message: 'Erro interno do servidor.' });
-    } finally {
-        if (connection) connection.end();
-    }
-});
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
+// Rota de Teste Simples (para confirmar que o servidor está vivo)
 app.get('/', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
+    res.send('API de Estoque (Backend) Rodando!');
+});
+
+// 2. Rota de Login
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    
+    // Simulação de login: use o seu hash/lógica real aqui
+    if (username === 'admin123' && password === 'admin123') {
+        return res.status(200).json({ success: true, message: 'Login bem-sucedido.' });
+    } else {
+        return res.status(401).json({ success: false, message: 'Credenciais inválidas.' });
+    }
+});
+
+// 3. Rota de Dados de Estoque (CRUD - GET)
+app.get('/api/estoque', async (req, res) => {
+    try {
+        const connection = await getConnection();
+        // SELECT corrigido: 'P' é a tabela de produtos, 'T' é a tabela de transações.
+        const [rows] = await connection.execute(`
+            SELECT 
+                P.id, 
+                P.code, 
+                P.name, 
+                P.category,
+                P.minimum,
+                COALESCE(SUM(CASE WHEN T.type = 'entrada' THEN T.quantity ELSE -T.quantity END), 0) AS quantity,
+                P.unitPrice, 
+                P.salePrice,
+                (P.salePrice * COALESCE(SUM(CASE WHEN T.type = 'entrada' THEN T.quantity ELSE -T.quantity END), 0)) AS totalValue,
+                CASE
+                    WHEN COALESCE(SUM(CASE WHEN T.type = 'entrada' THEN T.quantity ELSE -T.quantity END), 0) <= P.minimum * 0.5 THEN 'critical'
+                    WHEN COALESCE(SUM(CASE WHEN T.type = 'entrada' THEN T.quantity ELSE -T.quantity END), 0) <= P.minimum THEN 'warning'
+                    ELSE 'ok'
+                END AS status
+            FROM Produtos P
+            LEFT JOIN Transacoes_Estoque T ON P.id = T.product_id
+            GROUP BY P.id
+            HAVING quantity >= 0; 
+        `);
+        connection.end();
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Erro ao buscar dados do estoque:', error);
+        res.status(500).json({ success: false, message: 'Erro interno ao buscar estoque.' });
+    }
+});
+
+// 4. Rotas de KPI e Alertas (Exemplo - Você deve implementar a lógica SQL real)
+app.get('/api/kpi', async (req, res) => {
+    // *Aqui você deve implementar a lógica SQL para buscar os KPIs reais.*
+    // Retornando dados mockados para garantir que o Frontend carregue.
+    res.json({
+        success: true,
+        data: {
+            totalStockValue: 45280.50, // Exemplo de valor alto
+            salesPeriod: 18450.00,
+            expenses: 12320.00,
+            criticalItems: 8 
+        }
+    });
 });
 
 
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em em http://localhost:${PORT}`);
+app.listen(port, () => {
+    console.log(`🚀 Servidor API (Backend) rodando em http://localhost:${port}`);
+    console.log('✅ Certifique-se de que o Frontend (Vite) está rodando em http://localhost:5173');
 });
