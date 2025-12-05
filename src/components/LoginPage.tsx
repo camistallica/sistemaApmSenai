@@ -1,18 +1,23 @@
 // src/components/LoginPage.tsx
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+//import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { LogIn } from 'lucide-react';
 
-export function LoginPage() {
+// 1. CORREÇÃO ESSENCIAL: DEFINIÇÃO DA INTERFACE DA PROP
+interface LoginPageProps {
+    onLogin: (name: string) => void; 
+}
+
+// 2. O COMPONENTE AGORA RECEBE E DESESTRUTURA A PROP TIPADA
+export function LoginPage({ onLogin }: LoginPageProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Hook do React Router para navegação
-    const navigate = useNavigate();
+    //const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,25 +25,23 @@ export function LoginPage() {
         setError(null);
 
         try {
-            // Chamada à API de login no backend (porta 3001)
             const response = await axios.post('http://localhost:3001/api/login', {
                 username,
                 password,
             });
 
-            // Assumindo que a resposta de sucesso tem status 200 e uma flag 'success'
             if (response.status === 200 && response.data.success) {
-                // CORREÇÃO ESSENCIAL: 
-                // Usa 'navigate' do React Router para ir para a rota interna /dashboard.
-                // Isso mantém o navegador na porta 5173 (Frontend).
-                navigate('/dashboard'); 
+                // 3. CHAMADA BEM-SUCEDIDA: CHAMA A FUNÇÃO onLogin do App.tsx
+                onLogin(username); 
+                // A navegação agora é tratada pelo App.tsx (Navigate)
             } else {
                 setError('Credenciais inválidas. Tente novamente.');
+                setLoading(false); // Volta o loading apenas em caso de falha de credenciais
             }
         } catch (err) {
             console.error('Erro de login:', err);
-            setError('Falha na comunicação com o servidor. Verifique o backend (porta 3001) e o banco de dados.');
-        } finally {
+            // Se o backend retornou 401, o Axios cai aqui. Se for outro erro, exibe a mensagem genérica.
+            setError('Falha na comunicação com o servidor. Verifique se o backend está rodando e as credenciais.');
             setLoading(false);
         }
     };

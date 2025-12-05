@@ -216,13 +216,13 @@ export function StockTable() {
                                 <td className="px-6 py-4 text-sm text-slate-900 text-right">{item.quantity}</td>
                                 <td className="px-6 py-4 text-sm text-slate-900 text-right">
     {/* CORREÇÃO: Usa o operador || para garantir que o valor seja 0 se for null/undefined */}
-    R$ {(item.salePrice || 0).toFixed(2)}
+    R$ {Number(item.totalValue || 0).toFixed(2)}
 </td>
                                 <td className="px-6 py-4 text-sm text-slate-900 text-right">
     {/* CORREÇÃO: Usa o operador || para garantir que o valor seja 0 se for null/undefined */}
-    R$ {(item.totalValue || 0).toFixed(2)}
+    R$ {Number(item.totalValue || 0).toFixed(2)}
 </td>
-                                <td className="px-6 py-4 text-sm text-slate-900 text-right">R$ {item.totalValue.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-sm text-slate-900 text-right">R$ {Number(item.totalValue || 0).toFixed(2)}</td>
                                 <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
                                 <td className="px-6 py-4 text-center text-sm">
                                     <div className="flex justify-center gap-2">
